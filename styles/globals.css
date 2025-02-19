@@ -1,0 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap');
+
+:root {
+  --background: radial-gradient(circle, #f5f7fa 10%, #e3e7ed 50%, #d1d8e0 100%);
+  --water-color: #cce7ff;
+  --selected-color: #d1c4e9;
+  --shadow-light: rgba(0, 0, 0, 0.15);
+  --hover-border: rgba(0, 0, 0, 0.2);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  font-family: 'Quicksand', sans-serif;
+  overflow: hidden;
+}
