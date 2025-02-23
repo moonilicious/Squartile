@@ -1,26 +1,24 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import PopUp from './PopUp';
 import styles from './page.module.css';
 
 export default function Home() {
   const gridSize = 64;
   const [tiles, setTiles] = useState([]);
   const [selectedTiles, setSelectedTiles] = useState(new Set());
-  const [hoveredCountry, setHoveredCountry] = useState(null);
+  const [hoveredTile, setHoveredTile] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isRightClickDragging, setIsRightClickDragging] = useState(false);
-  const [startDrag, setStartDrag] = useState({ x: 0, y: 0 });
-
+  const [showPopup, setShowPopup] = useState(true);
+  const [selectedTileInfo, setSelectedTileInfo] = useState(null);
   const gridRef = useRef(null);
+
   const countryNames = [
     "Xyphos", "Zentharis", "Omicron", "Nyxara", "Tarkonis",
     "Vorlune", "Erythraea", "Draconis", "Aetheron", "Zephyria"
   ];
-
   const pastelColors = ["#FF8FA3", "#FFC488", "#7DD9F0", "#C08BC0", "#76F776", "#FFF488", "#CFCFFF"];
 
   useEffect(() => {
@@ -79,130 +77,95 @@ export default function Home() {
     });
   };
 
-  const handleTileClick = (index) => {
-    setSelectedTiles((prevSelected) => {
-      const newSelected = new Set(prevSelected);
-      newSelected.has(index) ? newSelected.delete(index) : newSelected.add(index);
-      return newSelected;
+  const handleTileClick = (index, event) => {
+    const tile = tiles[index];
+    if (!tile) return;
+
+    const rect = event.target.getBoundingClientRect();
+    const popupX = rect.left + rect.width / 2;
+    const popupY = rect.bottom + 5;
+
+    setSelectedTileInfo({
+      index,
+      ...tile,
+      x: index % gridSize,
+      y: Math.floor(index / gridSize),
+      screenX: popupX,
+      screenY: popupY,
     });
   };
 
-  const handleMouseMove = (e) => {
-    setMousePos({ x: e.clientX, y: e.clientY });
-
-    if (isRightClickDragging) {
-      const tileIndex = getTileIndexFromMouse(e.clientX, e.clientY);
-      if (tileIndex >= 0 && tileIndex < tiles.length) {
-        setSelectedTiles((prevSelected) => {
-          const newSelected = new Set(prevSelected);
-          newSelected.add(tileIndex);
-          return newSelected;
-        });
-      }
+  const handleBuyTile = () => {
+    if (selectedTileInfo) {
+      setSelectedTiles((prevSelected) => new Set([...prevSelected, selectedTileInfo.index]));
+      setSelectedTileInfo(null);
     }
   };
 
-  const handleMouseDown = (e) => {
-    if (e.button === 0) {
-      setIsDragging(true); // Left click: dragging
-      setStartDrag({ x: e.clientX, y: e.clientY });
-    } else if (e.button === 2) {
-      setIsRightClickDragging(true); // Right click: select tiles
+  const handleScroll = (event) => {
+    if (gridRef.current) {
+      gridRef.current.scrollLeft += event.deltaX;
+      gridRef.current.scrollTop += event.deltaY;
     }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setIsRightClickDragging(false);
-  };
-
-  const handleMouseLeave = () => {
-    setIsDragging(false);
-    setIsRightClickDragging(false);
-  };
-
-  const handleWheel = (e) => {
-    const scrollAmountX = e.deltaX;  // Detect horizontal scroll (left-right)
-    const scrollAmountY = e.deltaY;  // Detect vertical scroll (up-down)
-
-    const newOffset = { ...offset };
-
-    // Horizontal scroll
-    newOffset.x += scrollAmountX;
-
-    // Vertical scroll
-    newOffset.y += scrollAmountY;
-
-    setOffset(newOffset);
-  };
-
-  const getTileIndexFromMouse = (mouseX, mouseY) => {
-    const gridRect = gridRef.current.getBoundingClientRect();
-    const tileSize = gridRect.width / gridSize; // Calculate tile size based on grid width
-
-    // Adjust mouse coordinates for grid offset
-    const adjustedX = mouseX - gridRect.left - offset.x;
-    const adjustedY = mouseY - gridRect.top - offset.y;
-
-    // Calculate tile indices
-    const x = Math.floor(adjustedX / tileSize);
-    const y = Math.floor(adjustedY / tileSize);
-
-    // Ensure the indices are within the grid bounds
-    if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) {
-      return -1; // Return -1 if outside the grid
-    }
-
-    return y * gridSize + x;
   };
 
   return (
-    <div
-      className={styles.container}
-      onMouseMove={handleMouseMove}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
-      onWheel={handleWheel} // Mouse wheel scroll
-      onContextMenu={(e) => e.preventDefault()} // Prevent context menu on right-click
-    >
+    <div className={styles.container} onContextMenu={(e) => e.preventDefault()} onWheel={handleScroll}>
+      {showPopup && (
+        <div>
+          <PopUp onPlay={() => setShowPopup(false)} />
+        </div>
+      )}
+
       <main className={styles.main} ref={gridRef}>
-        <div
-          className={styles.grid}
-          style={{
-            transform: `translate(${offset.x}px, ${offset.y}px)`,
-            cursor: isDragging ? "grabbing" : "grab", 
-          }}
-        >
+        <div className={styles.grid}>
           {tiles.map((tile, i) => (
             <div
               key={i}
-              className={`${styles.tile}`}
+              className={`${styles.tile} ${selectedTiles.has(i) ? styles.selected : ''}`}
               style={{
                 "--border-color": tile?.borderColor || "#FFFFFF",
                 backgroundColor: selectedTiles.has(i) ? tile?.borderColor : "black",
               }}
-              data-selected={selectedTiles.has(i)}
-              onClick={() => handleTileClick(i)} // Left-click to select multiple tiles
+              onClick={(e) => handleTileClick(i, e)}
               onMouseEnter={(e) => {
-                setHoveredCountry(tile?.country);
-                setMousePos({ x: e.clientX, y: e.clientY });
+                setHoveredTile({ name: tile?.country, x: e.clientX, y: e.clientY });
               }}
-              onMouseLeave={() => setHoveredCountry(null)}
+              onMouseLeave={() => {
+                setHoveredTile(null);
+              }}
             />
           ))}
         </div>
       </main>
 
-      {hoveredCountry && (
+      {hoveredTile && (
         <div
           className={styles.countryName}
           style={{
-            top: mousePos.y + 30, 
-            left: mousePos.x + 10,
+            left: `${hoveredTile.x}px`,
+            top: `${hoveredTile.y - 50}px`
           }}
         >
-          {hoveredCountry}
+          {hoveredTile.name}
+        </div>
+      )}
+
+      {selectedTileInfo && (
+        <div
+          className={styles.tilePopup}
+          style={{
+            position: "absolute",
+            left: `${selectedTileInfo.screenX}px`,
+            top: `${selectedTileInfo.screenY}px`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <p>Country: {selectedTileInfo.country}</p>
+          <p>Color: {selectedTileInfo.borderColor}</p>
+          <p>Tile Index: {selectedTileInfo.index}</p>
+          <p>Coordinates: ({selectedTileInfo.x}, {selectedTileInfo.y})</p>
+          <button className={styles.futuristicButton} onClick={handleBuyTile}>Buy this Tile</button>
         </div>
       )}
     </div>
